@@ -25,11 +25,6 @@ module Suspenders
       )
     end
 
-    def provide_setup_script
-      copy_file 'bin_setup', 'bin/setup'
-      run 'chmod a+x bin/setup'
-    end
-
     def provide_dev_prime_task
       copy_file 'development_seeds.rb', 'lib/tasks/development_seeds.rake'
     end
@@ -57,22 +52,6 @@ module Suspenders
 
     def configure_newrelic
       template 'newrelic.yml.erb', 'config/newrelic.yml'
-    end
-
-    def configure_smtp
-      copy_file 'smtp.rb', 'config/smtp.rb'
-
-      prepend_file 'config/environments/production.rb',
-        "require Rails.root.join('config/smtp')\n"
-
-      config = <<-RUBY
-
-  config.action_mailer.delivery_method = :smtp
-  config.action_mailer.smtp_settings = SMTP_SETTINGS
-      RUBY
-
-      inject_into_file 'config/environments/production.rb', config,
-        :after => 'config.action_mailer.raise_delivery_errors = false'
     end
 
     def enable_rack_deflater
@@ -147,6 +126,11 @@ end
         force: true
     end
 
+    def use_sqlite_config_template
+      template 'sqlite_database.yml.erb', 'config/database.yml',
+        force: true
+    end
+
     def create_database
       bundle_command 'exec rake db:create db:migrate'
     end
@@ -158,11 +142,6 @@ end
 
     def set_ruby_to_version_being_used
       create_file '.ruby-version', "#{Suspenders::RUBY_VERSION}\n"
-    end
-
-    def setup_heroku_specific_gems
-      inject_into_file 'Gemfile', "\n\s\sgem 'rails_12factor'",
-        after: /group :staging, :production do/
     end
 
     def enable_database_cleaner
@@ -185,11 +164,6 @@ end
 
     def configure_i18n_in_specs
       copy_file 'i18n.rb', 'spec/support/i18n.rb'
-    end
-
-    def configure_background_jobs_for_rspec
-      copy_file 'background_jobs_rspec.rb', 'spec/support/background_jobs.rb'
-      run 'rails g delayed_job:active_record'
     end
 
     def configure_action_mailer_in_specs
@@ -236,19 +210,10 @@ end
       copy_file 'unicorn.rb', 'config/unicorn.rb'
     end
 
-    def setup_foreman
-      copy_file 'sample.env', '.sample.env'
-      copy_file 'Procfile', 'Procfile'
-    end
-
     def setup_stylesheets
       remove_file 'app/assets/stylesheets/application.css'
       copy_file 'application.css.scss',
         'app/assets/stylesheets/application.css.scss'
-    end
-
-    def install_bitters
-      run "bitters install --path app/assets/stylesheets"
     end
 
     def gitignore_files
@@ -270,55 +235,6 @@ end
 
     def init_git
       run 'git init'
-    end
-
-    def create_heroku_apps
-      path_addition = override_path_for_tests
-      run "#{path_addition} heroku create #{app_name}-production --remote=production"
-      run "#{path_addition} heroku create #{app_name}-staging --remote=staging"
-      run "#{path_addition} heroku config:add RACK_ENV=staging RAILS_ENV=staging --remote=staging"
-    end
-
-    def set_heroku_remotes
-      remotes = <<-SHELL
-
-# Set up staging and production git remotes.
-git remote add staging git@heroku.com:#{app_name}-staging.git || true
-git remote add production git@heroku.com:#{app_name}-production.git || true
-
-# Join the staging and production apps.
-#{join_heroku_app('staging')}
-#{join_heroku_app('production')}
-      SHELL
-
-      append_file 'bin/setup', remotes
-    end
-
-    def join_heroku_app(environment)
-      heroku_app_name = "#{app_name}-#{environment}"
-      <<-SHELL
-if heroku join --app #{heroku_app_name} &> /dev/null; then
-  echo 'You are a collaborator on the "#{heroku_app_name}" Heroku app'
-else
-  echo 'Ask for access to the "#{heroku_app_name}" Heroku app'
-fi
-      SHELL
-    end
-
-    def set_heroku_rails_secrets
-      path_addition = override_path_for_tests
-      run "#{path_addition} heroku config:add SECRET_KEY_BASE=#{generate_secret} --remote=staging"
-      run "#{path_addition} heroku config:add SECRET_KEY_BASE=#{generate_secret} --remote=production"
-    end
-
-    def create_github_repo(repo_name)
-      path_addition = override_path_for_tests
-      run "#{path_addition} hub create #{repo_name}"
-    end
-
-    def setup_segment_io
-      copy_file '_analytics.html.erb',
-        'app/views/application/_analytics.html.erb'
     end
 
     def copy_miscellaneous_files

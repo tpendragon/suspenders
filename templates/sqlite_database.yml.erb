@@ -1,0 +1,11 @@
+development: &default
+  adapter: sqlite3
+  database: db/<%= app_name %>_development.sqlite3
+  encoding: utf8
+  min_messages: warning
+  pool: 2
+  timeout: 5000
+
+test:
+  <<: *default
+  database: db/<%= app_name %>_test.sqlite3

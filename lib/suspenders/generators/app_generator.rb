@@ -6,12 +6,6 @@ module Suspenders
     class_option :database, :type => :string, :aliases => '-d', :default => 'postgresql',
       :desc => "Preconfigure for selected database (options: #{DATABASES.join('/')})"
 
-    class_option :heroku, :type => :boolean, :aliases => '-H', :default => false,
-      :desc => 'Create staging and production Heroku apps'
-
-    class_option :github, :type => :string, :aliases => '-G', :default => nil,
-      :desc => 'Create Github repository and add remote origin pointed to repo'
-
     class_option :skip_test_unit, :type => :boolean, :aliases => '-T', :default => true,
       :desc => 'Skip Test::Unit files'
 
@@ -31,25 +25,17 @@ module Suspenders
       invoke :setup_coffeescript
       invoke :configure_app
       invoke :setup_stylesheets
-      invoke :install_bitters
       invoke :copy_miscellaneous_files
       invoke :customize_error_pages
       invoke :remove_routes_comment_lines
       invoke :setup_git
       invoke :setup_database
-      invoke :create_heroku_apps
-      invoke :create_github_repo
-      invoke :setup_segment_io
       invoke :outro
     end
 
     def customize_gemfile
       build :replace_gemfile
       build :set_ruby_to_version_being_used
-
-      if options[:heroku]
-        build :setup_heroku_specific_gems
-      end
 
       bundle_command 'install'
     end
@@ -59,6 +45,10 @@ module Suspenders
 
       if 'postgresql' == options[:database]
         build :use_postgres_config_template
+      end
+
+      if 'sqlite3' == options[:database]
+        build :use_sqlite_config_template
       end
 
       build :create_database
@@ -78,7 +68,6 @@ module Suspenders
       build :set_up_factory_girl_for_rspec
       build :generate_rspec
       build :configure_rspec
-      build :configure_background_jobs_for_rspec
       build :enable_database_cleaner
       build :configure_spec_support_features
       build :configure_travis
@@ -89,7 +78,6 @@ module Suspenders
     def setup_production_environment
       say 'Setting up the production environment'
       build :configure_newrelic
-      build :configure_smtp
       build :enable_rack_deflater
       build :setup_asset_host
     end
@@ -127,17 +115,11 @@ module Suspenders
       build :fix_i18n_deprecation_warning
       build :setup_default_rake_task
       build :configure_unicorn
-      build :setup_foreman
     end
 
     def setup_stylesheets
       say 'Set up stylesheets'
       build :setup_stylesheets
-    end
-
-    def install_bitters
-      say 'Install Bitters'
-      build :install_bitters
     end
 
     def setup_git
@@ -146,27 +128,6 @@ module Suspenders
         invoke :setup_gitignore
         invoke :init_git
       end
-    end
-
-    def create_heroku_apps
-      if options[:heroku]
-        say 'Creating Heroku apps'
-        build :create_heroku_apps
-        build :set_heroku_remotes
-        build :set_heroku_rails_secrets
-      end
-    end
-
-    def create_github_repo
-      if !options[:skip_git] && options[:github]
-        say 'Creating Github repo'
-        build :create_github_repo, options[:github]
-      end
-    end
-
-    def setup_segment_io
-      say 'Setting up Segment.io'
-      build :setup_segment_io
     end
 
     def setup_gitignore
